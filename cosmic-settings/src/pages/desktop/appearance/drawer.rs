@@ -1,5 +1,5 @@
 use cosmic::app::{ContextDrawer, context_drawer};
-use cosmic::config::CosmicTk;
+use cosmic::config::{CosmicTk, WindowControlOrder, WindowControlPlacement};
 use cosmic::cosmic_config::{Config, ConfigSet};
 use cosmic::cosmic_theme::Spacing;
 use cosmic::iced::Alignment;
@@ -35,6 +35,7 @@ pub struct Content {
     icon_global: bool,
     icon_themes: IconThemes,
     icon_handles: IconHandles,
+    win_controls_aligned_left: bool,
     tk_config: Option<Config>,
     frosted: u8,
     glass: f32,
@@ -68,6 +69,12 @@ pub enum IconMessage {
     IconLoaded((IconThemes, IconHandles)),
     IconTheme(usize),
     ApplyThemeGlobal(bool),
+}
+
+#[derive(Debug, Clone)]
+pub enum WindowControlMessage {
+    ControlsSetLeft(bool),
+    ControlOrderSet(WindowControlOrder),
 }
 
 crate::cache_dynamic_lazy! {
@@ -136,6 +143,7 @@ impl From<&theme_manager::Manager> for Content {
             icon_theme_active: None,
             icon_themes: Vec::new(),
             icon_handles: Vec::new(),
+            win_controls_aligned_left: cosmic::config::window_control_placement().place_left,
             tk_config: CosmicTk::config().ok(),
             comp_config,
             #[cfg(feature = "cosmic-comp-config")]
@@ -271,6 +279,37 @@ impl Content {
                     cosmic::theme::system_preference(),
                 ));
             }
+        }
+        Task::none()
+    }
+
+    pub fn update_window_controls(
+        &mut self,
+        message: WindowControlMessage,
+        _context_view: &ContextView,
+    ) -> Task<app::Message> {
+
+        match message {
+            WindowControlMessage::ControlsSetLeft(set_left) => {
+                if let Some(config) = self.tk_config.as_ref() {
+
+                    let mut control_placement: WindowControlPlacement =
+                        config.get::<WindowControlPlacement>("window_control_placement")
+                            .unwrap_or_default();
+
+                    control_placement.place_left = set_left;
+
+                    _ = config.set("window_control_placement", control_placement);
+                    self.win_controls_aligned_left = set_left;
+                } else {
+                    error!(
+                        "Failed to apply windows control placement to GNOME config because the CosmicTK config does not exist."
+                    );
+                }
+            },
+            WindowControlMessage::ControlOrderSet(_) => {
+
+            },
         }
         Task::none()
     }
@@ -523,6 +562,11 @@ impl Content {
                 crate::pages::Message::CloseContextDrawer,
             ),
 
+            ContextView::WindowControlPlacement => context_drawer(
+                self.window_control_placement(),
+                crate::pages::Message::CloseContextDrawer,
+            ),
+
             #[cfg(feature = "cosmic-comp-config")]
             ContextView::ShadowAndCorners => context_drawer(
                 self.shadow_and_corners(),
@@ -577,6 +621,30 @@ impl Content {
                 .into()
             ])
             .spacing(space_xxs)
+        ]
+        .spacing(space_m)
+        .width(Length::Fill)
+        .apply(Element::from)
+        .map(crate::pages::Message::Appearance)
+    }
+
+    pub fn window_control_placement(&self) -> Element<'_, crate::pages::Message> {
+
+        let Spacing {
+            space_xxs,
+            space_xs,
+            space_m,
+            ..
+        } = cosmic::theme::spacing();
+
+        cosmic::iced::widget::column![
+            settings::section().add(
+                settings::item::builder(fl!("window-control-alignment"))
+                    .description(fl!("window-control-alignment", "desc"))
+                    .toggler(self.win_controls_aligned_left, |b| {
+                        Message::DrawerWinControls(WindowControlMessage::ControlsSetLeft(b))
+                    })
+            ),
         ]
         .spacing(space_m)
         .width(Length::Fill)

@@ -411,6 +411,9 @@ enable-export = Apply current theme to GNOME apps
 icon-theme = Icon theme
     .desc = Applies a different set of icons to applications
 
+window-control-alignment = Window control alignment
+    .desc = Align window controls to the left
+
 text-tint = Interface text tint
     .desc = Used to derive interface text colors that have sufficient contrast on various surfaces
 
@@ -448,6 +451,7 @@ icons-and-toolkit = Icons and toolkit theming
 interface-font = System font
 monospace-font = Monospace font
 shadow-and-corners = Window shadow and corners
+window-control-placement = Window control placement
 
 ## Desktop: Notifications
 
