@@ -316,8 +316,36 @@ impl Content {
                     );
                 }
             },
-            WindowControlMessage::ControlOrderSet(_) => {
+            WindowControlMessage::ControlOrderSet(ordered_controls) => {
+                if let Some(config) = self.tk_config.as_ref() {
 
+                    let mut control_placement: WindowControlPlacement =
+                        config.get::<WindowControlPlacement>("window_control_placement")
+                            .unwrap_or_default();
+
+                    if ordered_controls.len() != self.win_control_order.len()
+                    {
+                        error!(
+                            "Failed to apply windows control order because the \
+                            number of controls is incorrect."
+                        );
+                    }
+
+                    for ii in 0..self.win_control_order.len()
+                    {
+                        self.win_control_order[ii] =
+                            WindowControl::try_from(ordered_controls[ii]).unwrap();
+                    }
+
+                    let _ = control_placement.set_control_order(&self.win_control_order);
+
+                    _ = config.set("window_control_placement", control_placement);
+                } else {
+                    error!(
+                        "Failed to apply windows control placement because the \
+                        CosmicTK config does not exist."
+                    );
+                }
             },
         }
         Task::none()
@@ -660,7 +688,7 @@ impl Content {
 
                 for win_control in &self.win_control_order {
                     row = row.push(
-                        *win_control as u32,
+                        (*win_control).into(),
                         widget::icon::from_name(match win_control{
                             WindowControl::Minimize => "window-minimize-symbolic",
                             WindowControl::Close => "window-close-symbolic",
@@ -674,14 +702,12 @@ impl Content {
                 use cosmic::iced::alignment::Horizontal;
 
                 settings::section()
-                    .title("Window control ordering")
-                    .add(widget::container(
-                        widget::container(row)
+                    .title(fl!("window-control-ordering"))
+                    .add(widget::container(row)
                             .align_x(if self.win_controls_aligned_left {Horizontal::Left} else {Horizontal::Right})
                             .width(Length::Fill)
                             .class(cosmic::theme::Container::Background)
                     )
-                    .width(Length::Fill))
             }
         ]
         .spacing(space_m)
