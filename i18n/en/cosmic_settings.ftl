@@ -411,8 +411,7 @@ enable-export = Apply current theme to GNOME apps
 icon-theme = Icon theme
     .desc = Applies a different set of icons to applications
 
-window-control-alignment = Window control alignment
-    .desc = Align window controls to the left
+window-control-alignment = Align window controls to the left
 
 text-tint = Interface text tint
     .desc = Used to derive interface text colors that have sufficient contrast on various surfaces

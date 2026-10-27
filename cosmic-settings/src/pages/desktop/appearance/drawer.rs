@@ -1,17 +1,19 @@
 use cosmic::app::{ContextDrawer, context_drawer};
-use cosmic::config::{CosmicTk, WindowControlOrder, WindowControlPlacement};
+use cosmic::config::{CosmicTk, WindowControl, WindowControlOrder, WindowControlPlacement};
 use cosmic::cosmic_config::{Config, ConfigSet};
 use cosmic::cosmic_theme::Spacing;
 use cosmic::iced::Alignment;
 use cosmic::iced::core::{Color, Length};
 use cosmic::widget::color_picker::ColorPickerUpdate;
-use cosmic::widget::{ColorPickerModel, container, flex_row, row, settings, slider, text};
+use cosmic::widget::{ColorPickerModel, container, flex_row, reorderable_flex_row, row, settings,
+                     slider, text};
 use cosmic::{Apply, Element, Task, task, widget};
 use cosmic_config::ConfigGet;
 use std::sync::Arc;
 use tracing::error;
 
 use crate::app;
+use crate::theme;
 use crate::widget::color_picker_context_view;
 
 use super::icon_themes::{IconHandles, IconThemes};
@@ -36,6 +38,7 @@ pub struct Content {
     icon_themes: IconThemes,
     icon_handles: IconHandles,
     win_controls_aligned_left: bool,
+    win_control_order: WindowControlOrder,
     tk_config: Option<Config>,
     frosted: u8,
     glass: f32,
@@ -74,7 +77,7 @@ pub enum IconMessage {
 #[derive(Debug, Clone)]
 pub enum WindowControlMessage {
     ControlsSetLeft(bool),
-    ControlOrderSet(WindowControlOrder),
+    ControlOrderSet(Vec<u32>),
 }
 
 crate::cache_dynamic_lazy! {
@@ -144,6 +147,7 @@ impl From<&theme_manager::Manager> for Content {
             icon_themes: Vec::new(),
             icon_handles: Vec::new(),
             win_controls_aligned_left: cosmic::config::window_control_placement().place_left,
+            win_control_order: *cosmic::config::window_control_placement().get_control_order(),
             tk_config: CosmicTk::config().ok(),
             comp_config,
             #[cfg(feature = "cosmic-comp-config")]
@@ -285,9 +289,13 @@ impl Content {
 
     pub fn update_window_controls(
         &mut self,
-        message: WindowControlMessage,
-        _context_view: &ContextView,
+        message: WindowControlMessage
     ) -> Task<app::Message> {
+
+        let Spacing {
+            space_s,
+            ..
+        } = cosmic::theme::spacing();
 
         match message {
             WindowControlMessage::ControlsSetLeft(set_left) => {
@@ -303,7 +311,8 @@ impl Content {
                     self.win_controls_aligned_left = set_left;
                 } else {
                     error!(
-                        "Failed to apply windows control placement to GNOME config because the CosmicTK config does not exist."
+                        "Failed to apply windows control placement because the \
+                        CosmicTK config does not exist."
                     );
                 }
             },
@@ -631,8 +640,7 @@ impl Content {
     pub fn window_control_placement(&self) -> Element<'_, crate::pages::Message> {
 
         let Spacing {
-            space_xxs,
-            space_xs,
+            space_s,
             space_m,
             ..
         } = cosmic::theme::spacing();
@@ -640,11 +648,41 @@ impl Content {
         cosmic::iced::widget::column![
             settings::section().add(
                 settings::item::builder(fl!("window-control-alignment"))
-                    .description(fl!("window-control-alignment", "desc"))
                     .toggler(self.win_controls_aligned_left, |b| {
                         Message::DrawerWinControls(WindowControlMessage::ControlsSetLeft(b))
                     })
             ),
+            {
+                let mut row = reorderable_flex_row(|order|
+                    Message::DrawerWinControls(WindowControlMessage::ControlOrderSet(order))
+                )
+                .spacing(space_s);
+
+                for win_control in &self.win_control_order {
+                    row = row.push(
+                        *win_control as u32,
+                        widget::icon::from_name(match win_control{
+                            WindowControl::Minimize => "window-minimize-symbolic",
+                            WindowControl::Close => "window-close-symbolic",
+                            WindowControl::Maximize => "window-maximize-symbolic",
+                        })
+                        .apply(widget::button::icon)
+                        .icon_size(16)
+                    );
+                }
+
+                use cosmic::iced::alignment::Horizontal;
+
+                settings::section()
+                    .title("Window control ordering")
+                    .add(widget::container(
+                        widget::container(row)
+                            .align_x(if self.win_controls_aligned_left {Horizontal::Left} else {Horizontal::Right})
+                            .width(Length::Fill)
+                            .class(cosmic::theme::Container::Background)
+                    )
+                    .width(Length::Fill))
+            }
         ]
         .spacing(space_m)
         .width(Length::Fill)

@@ -233,9 +233,7 @@ impl Page {
             }
 
             Message::DrawerWinControls(message) => {
-                if let Some(context_view) = self.context_view.as_ref() {
-                    self.drawer.update_window_controls(message, context_view);
-                }
+                self.drawer.update_window_controls(message);
             }
 
             #[cfg(feature = "cosmic-comp-config")]
