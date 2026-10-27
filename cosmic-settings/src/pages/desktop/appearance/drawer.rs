@@ -13,7 +13,6 @@ use std::sync::Arc;
 use tracing::error;
 
 use crate::app;
-use crate::theme;
 use crate::widget::color_picker_context_view;
 
 use super::icon_themes::{IconHandles, IconThemes};
@@ -78,6 +77,7 @@ pub enum IconMessage {
 pub enum WindowControlMessage {
     ControlsSetLeft(bool),
     ControlOrderSet(Vec<u32>),
+    ResetToDefaults,
 }
 
 crate::cache_dynamic_lazy! {
@@ -292,11 +292,6 @@ impl Content {
         message: WindowControlMessage
     ) -> Task<app::Message> {
 
-        let Spacing {
-            space_s,
-            ..
-        } = cosmic::theme::spacing();
-
         match message {
             WindowControlMessage::ControlsSetLeft(set_left) => {
                 if let Some(config) = self.tk_config.as_ref() {
@@ -337,7 +332,7 @@ impl Content {
                             WindowControl::try_from(ordered_controls[ii]).unwrap();
                     }
 
-                    let _ = control_placement.set_control_order(&self.win_control_order);
+                    let _ = control_placement.set_control_order(self.win_control_order);
 
                     _ = config.set("window_control_placement", control_placement);
                 } else {
@@ -347,6 +342,22 @@ impl Content {
                     );
                 }
             },
+            WindowControlMessage::ResetToDefaults =>
+            {
+                if let Some(config) = self.tk_config.as_ref() {
+
+                    _ = config.set("window_control_placement", WindowControlPlacement::default());
+
+                    self.win_controls_aligned_left = false;
+                    self.win_control_order = cosmic::config::DEFAULT_WINDOW_CONTROL_ORDER;
+
+                } else {
+                    error!(
+                        "Failed to apply windows control placement because the \
+                        CosmicTK config does not exist."
+                    );
+                }
+            }
         }
         Task::none()
     }
@@ -708,6 +719,10 @@ impl Content {
                             .width(Length::Fill)
                             .class(cosmic::theme::Container::Background)
                     )
+            },
+            {
+                widget::button::text(fl!("reset-to-default"))
+                    .on_press(Message::DrawerWinControls(WindowControlMessage::ResetToDefaults))
             }
         ]
         .spacing(space_m)
