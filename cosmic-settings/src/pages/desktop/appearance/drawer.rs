@@ -288,7 +288,7 @@ impl Content {
         Task::none()
     }
 
-    pub fn update_window_controls(&mut self, message: WindowControlMessage) -> Task<app::Message> {
+    pub fn update_window_controls(&mut self, message: WindowControlMessage) {
         const ERROR_MESSAGE_NO_TK_CONFIG: &str =
             "Failed to apply window control options because the CosmicTK config does not exist.";
         const ERROR_MESSAGE_INVALID_CONTROLS: &str =
@@ -296,7 +296,7 @@ impl Content {
 
         let Some(config) = self.tk_config.as_ref() else {
             error!(ERROR_MESSAGE_NO_TK_CONFIG);
-            return Task::none();
+            return;
         };
 
         match message {
@@ -345,7 +345,6 @@ impl Content {
                 self.win_control_order = cosmic::config::DEFAULT_WINDOW_CONTROL_ORDER_RIGHT;
             }
         }
-        Task::none()
     }
 
     #[cfg(feature = "cosmic-comp-config")]
