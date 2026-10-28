@@ -46,6 +46,7 @@ pub enum ContextView {
     ShadowAndCorners,
     CustomAccent,
     IconsAndToolkit,
+    WindowControlPlacement,
     InterfaceText,
     MonospaceFont,
     SystemFont,
@@ -133,6 +134,8 @@ pub enum Message {
     DrawerCorners(drawer::CornerMessage),
     DrawerFont(drawer::FontMessage),
     DrawerIcon(drawer::IconMessage),
+
+    DrawerWinControls(drawer::WindowControlMessage),
 
     #[cfg(feature = "xdg-portal")]
     ExportError,
@@ -227,6 +230,10 @@ impl Page {
                 if let Some(context_view) = self.context_view.as_ref() {
                     tasks.push(self.drawer.update_icon(message, context_view));
                 }
+            }
+
+            Message::DrawerWinControls(message) => {
+                self.drawer.update_window_controls(message);
             }
 
             #[cfg(feature = "cosmic-comp-config")]
@@ -851,6 +858,7 @@ pub fn experimental() -> Section<crate::pages::Message> {
         interface_font_txt = fl!("interface-font");
         monospace_font_txt = fl!("monospace-font");
         icons_and_toolkit_txt = fl!("icons-and-toolkit");
+        window_control_placement_txt = fl!("window-control-placement");
         shadow_and_corners_txt = fl!("shadow-and-corners");
     });
 
@@ -877,11 +885,17 @@ pub fn experimental() -> Section<crate::pages::Message> {
                 Message::DrawerOpen(ContextView::IconsAndToolkit),
             );
 
+            let window_control_placement = crate::widget::go_next_item(
+                &descriptions[window_control_placement_txt],
+                Message::DrawerOpen(ContextView::WindowControlPlacement),
+            );
+
             let mut section = settings::section()
                 .title(&*section.title)
                 .add(system_font)
                 .add(mono_font)
-                .add(icons_and_toolkit);
+                .add(icons_and_toolkit)
+                .add(window_control_placement);
 
             #[cfg(feature = "cosmic-comp-config")]
             {
