@@ -5,8 +5,9 @@ use cosmic::cosmic_theme::Spacing;
 use cosmic::iced::Alignment;
 use cosmic::iced::core::{Color, Length};
 use cosmic::widget::color_picker::ColorPickerUpdate;
-use cosmic::widget::{ColorPickerModel, container, flex_row, reorderable_flex_row, row, settings,
-                     slider, text};
+use cosmic::widget::{
+    ColorPickerModel, container, flex_row, reorderable_flex_row, row, settings, slider, text,
+};
 use cosmic::{Apply, Element, Task, task, widget};
 use cosmic_config::ConfigGet;
 use std::sync::Arc;
@@ -287,76 +288,61 @@ impl Content {
         Task::none()
     }
 
-    pub fn update_window_controls(
-        &mut self,
-        message: WindowControlMessage
-    ) -> Task<app::Message> {
+    pub fn update_window_controls(&mut self, message: WindowControlMessage) -> Task<app::Message> {
+        const ERROR_MESSAGE_NO_TK_CONFIG: &str =
+            "Failed to apply window control options because the CosmicTK config does not exist.";
+        const ERROR_MESSAGE_INVALID_CONTROLS: &str =
+            "Failed to apply windows control order because the number of controls was incorrect.";
+
+        let Some(config) = self.tk_config.as_ref() else {
+            error!(ERROR_MESSAGE_NO_TK_CONFIG);
+            return Task::none();
+        };
 
         match message {
+            // ----------------------------------------------------------------
             WindowControlMessage::ControlsSetLeft(set_left) => {
-                if let Some(config) = self.tk_config.as_ref() {
+                let mut control_placement: WindowControlPlacement = config
+                    .get::<WindowControlPlacement>("window_control_placement")
+                    .unwrap_or_default();
 
-                    let mut control_placement: WindowControlPlacement =
-                        config.get::<WindowControlPlacement>("window_control_placement")
-                            .unwrap_or_default();
+                control_placement.place_left = set_left;
+                self.win_controls_aligned_left = set_left;
 
-                    control_placement.place_left = set_left;
+                // Return ignored by precedent
+                _ = config.set("window_control_placement", control_placement);
+            }
 
-                    _ = config.set("window_control_placement", control_placement);
-                    self.win_controls_aligned_left = set_left;
-                } else {
-                    error!(
-                        "Failed to apply windows control placement because the \
-                        CosmicTK config does not exist."
-                    );
-                }
-            },
+            // ----------------------------------------------------------------
             WindowControlMessage::ControlOrderSet(ordered_controls) => {
-                if let Some(config) = self.tk_config.as_ref() {
+                let mut control_placement: WindowControlPlacement = config
+                    .get::<WindowControlPlacement>("window_control_placement")
+                    .unwrap_or_default();
 
-                    let mut control_placement: WindowControlPlacement =
-                        config.get::<WindowControlPlacement>("window_control_placement")
-                            .unwrap_or_default();
-
-                    if ordered_controls.len() != self.win_control_order.len()
-                    {
-                        error!(
-                            "Failed to apply windows control order because the \
-                            number of controls is incorrect."
-                        );
-                    }
-
-                    for ii in 0..self.win_control_order.len()
-                    {
-                        self.win_control_order[ii] =
-                            WindowControl::try_from(ordered_controls[ii]).unwrap();
-                    }
-
-                    let _ = control_placement.set_control_order(self.win_control_order);
-
-                    _ = config.set("window_control_placement", control_placement);
-                } else {
-                    error!(
-                        "Failed to apply windows control placement because the \
-                        CosmicTK config does not exist."
-                    );
+                if ordered_controls.len() != self.win_control_order.len() {
+                    error!(ERROR_MESSAGE_INVALID_CONTROLS);
                 }
-            },
-            WindowControlMessage::ResetToDefaults =>
-            {
-                if let Some(config) = self.tk_config.as_ref() {
 
-                    _ = config.set("window_control_placement", WindowControlPlacement::default());
-
-                    self.win_controls_aligned_left = false;
-                    self.win_control_order = cosmic::config::DEFAULT_WINDOW_CONTROL_ORDER;
-
-                } else {
-                    error!(
-                        "Failed to apply windows control placement because the \
-                        CosmicTK config does not exist."
-                    );
+                for ii in 0..self.win_control_order.len() {
+                    self.win_control_order[ii] =
+                        WindowControl::try_from(ordered_controls[ii]).unwrap();
                 }
+
+                _ = control_placement.set_control_order(self.win_control_order);
+                // Return ignored by precedent
+                _ = config.set("window_control_placement", control_placement);
+            }
+
+            // ----------------------------------------------------------------
+            WindowControlMessage::ResetToDefaults => {
+                // Return ignored by precedent
+                _ = config.set(
+                    "window_control_placement",
+                    WindowControlPlacement::default(),
+                );
+
+                self.win_controls_aligned_left = false;
+                self.win_control_order = cosmic::config::DEFAULT_WINDOW_CONTROL_ORDER_RIGHT;
             }
         }
         Task::none()
@@ -677,11 +663,8 @@ impl Content {
     }
 
     pub fn window_control_placement(&self) -> Element<'_, crate::pages::Message> {
-
         let Spacing {
-            space_s,
-            space_m,
-            ..
+            space_s, space_m, ..
         } = cosmic::theme::spacing();
 
         cosmic::iced::widget::column![
@@ -692,21 +675,21 @@ impl Content {
                     })
             ),
             {
-                let mut row = reorderable_flex_row(|order|
+                let mut row = reorderable_flex_row(|order| {
                     Message::DrawerWinControls(WindowControlMessage::ControlOrderSet(order))
-                )
+                })
                 .spacing(space_s);
 
                 for win_control in &self.win_control_order {
                     row = row.push(
                         (*win_control).into(),
-                        widget::icon::from_name(match win_control{
+                        widget::icon::from_name(match win_control {
                             WindowControl::Minimize => "window-minimize-symbolic",
                             WindowControl::Close => "window-close-symbolic",
                             WindowControl::Maximize => "window-maximize-symbolic",
                         })
                         .apply(widget::button::icon)
-                        .icon_size(16)
+                        .icon_size(16),
                     );
                 }
 
@@ -714,15 +697,21 @@ impl Content {
 
                 settings::section()
                     .title(fl!("window-control-ordering"))
-                    .add(widget::container(row)
-                            .align_x(if self.win_controls_aligned_left {Horizontal::Left} else {Horizontal::Right})
+                    .add(
+                        widget::container(row)
+                            .align_x(if self.win_controls_aligned_left {
+                                Horizontal::Left
+                            } else {
+                                Horizontal::Right
+                            })
                             .width(Length::Fill)
-                            .class(cosmic::theme::Container::Background)
+                            .class(cosmic::theme::Container::Background),
                     )
             },
             {
-                widget::button::text(fl!("reset-to-default"))
-                    .on_press(Message::DrawerWinControls(WindowControlMessage::ResetToDefaults))
+                widget::button::text(fl!("reset-to-default")).on_press(Message::DrawerWinControls(
+                    WindowControlMessage::ResetToDefaults,
+                ))
             }
         ]
         .spacing(space_m)
